@@ -61,7 +61,7 @@ def main_ring(self, topo_desc=None):
         lat = topo_desc.get('ring_link_lat','3ms')
         sw_list = []
         for i in range(n_sw):
-                sw_list.append(self.addSwitch('sw{}'.format(i+1)))
+                sw_list.append(self.addSwitch('s{}'.format(i+1)))
                 if i == 0:
                         continue
                 self.addLink(sw_list[i], sw_list[i-1], bw=bw,delay=lat)
@@ -86,7 +86,7 @@ def secondary_rings(self, topo_desc=None, main_ring=None):
 
                 sw_list = []
                 for j in range(begin_names,end_names):
-                        sw_list.append(self.addSwitch('sw{}'.format(j)))
+                        sw_list.append(self.addSwitch('s{}'.format(j)))
                         if j == begin_names:
                                 self.addLink(sw_list[j-begin_names],main_ring[begin-1], \
                                 bw=bw,delay=lat)
@@ -111,7 +111,7 @@ def add_hosts(self, hosts_names=[], sw_acc=None, sw_mr=None, mr=None, bw=None, d
 		hosts_names = [hosts_names[0],hosts_names[0]]
 
 	if not sw_acc is None:
-		mr.append(self.addSwitch('sw{}'.format(sw_acc)))
+		mr.append(self.addSwitch('s{}'.format(sw_acc)))
 		self.addLink(mr[-1], mr[sw_mr-1], bw=topo_desc.get('ring_link_bw'), delay=topo_desc.get('ring_link_lat'))
 	else:
 		sw_acc = sw_mr
@@ -155,7 +155,7 @@ def add_datacenter(self, mr=None, datacenter_desc=None):
 	# Add switches
 	sw_list = []
 	for sw in name_sws:
-		sw_list.append(self.addSwitch('sw{}'.format(sw)))
+		sw_list.append(self.addSwitch('s{}'.format(sw)))
 		for sw_acc_i in sw_acc:
 			self.addLink(sw_list[-1], mr[sw_acc_i-1], bw=bw, delay=lat)
 

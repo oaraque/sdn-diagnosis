@@ -38,30 +38,54 @@ from pox.lib.addresses import EthAddr, IPAddr # Address types
 import pox.lib.util as poxutil                # Various util functions
 import pox.lib.revent as revent               # Event library
 import pox.lib.recoco as recoco               # Multitasking library
+from pox.openflow.of_json import *
+
+import multiprocessing
+import json
 
 # Create a logger for this component
-log = core.getLogger()
+log = core.getLogger("Monitor")
 
+def _send_to_pipe(data):
+    with open('/dev/shm/poxpipe','w') as pipe:
+        pipe.write(data)
+
+def _to_pipe(data):
+    p = multiprocessing.Process(target=_send_to_pipe, args=(data,))
+    p.start()
 
 def _go_up (event):
-  # Event handler called when POX goes into up state
-  # (we actually listen to the event in launch() below)
-  log.info("Monitor application ready.")
+    # Event handler called when POX goes into up state
+    # (we actually listen to the event in launch() below)
+    log.info("Monitor application ready.")
 
+def _request_stats():
+    for connection in core.openflow.connections:
+        log.debug("Sending stats request")
+        #connection.send(of.ofp_stats_request(body=of.ofp_flow_stats_request()))
+        connection.send(of.ofp_stats_request(body=of.ofp_port_stats_request()))
+
+def _handle_flowstats(event):
+    log.debug(len(event.stats))
+
+def _handle_portstats(event):
+    stats = flow_stats_to_list(event.stats)
+    dpid = poxutil.dpidToStr(event.connection.dpid)
+    #log.debug(event.stats)
+    #log.debug(stats)
+    data = {'type':"switch_portstats", "data":{'switch':dpid, 'stats':stats}}
+    data = json.dumps(data)
+    _to_pipe(data)
 
 @poxutil.eval_args
-def launch (foo, bar = False):
-  """
-  The default launcher just logs its arguments
-  """
-  log.warn("Foo: %s (%s)", foo, type(foo))
-  log.warn("Bar: %s (%s)", bar, type(bar))
+def launch (bar = False):
+    """
+    The default launcher just logs its arguments
+    """
+    log.warn("Bar: %s (%s)", bar, type(bar))
 
-  core.addListenerByName("UpEvent", _go_up)
+    core.addListenerByName("UpEvent", _go_up)
+    core.openflow.addListenerByName("FlowStatsReceived", _handle_flowstats)
+    core.openflow.addListenerByName("PortStatsReceived", _handle_portstats)
 
-  def start():
-    #print(core.openflow.connections)
-    print('--- Miau')
-
-  print(core.openflow.connections)
-
+    recoco.Timer(10, _request_stats, recurring=True)
