@@ -60,13 +60,20 @@ def _go_up (event):
     log.info("Monitor application ready.")
 
 def _request_stats():
+    log.debug(len(core.openflow.connections))
     for connection in core.openflow.connections:
         log.debug("Sending stats request")
-        #connection.send(of.ofp_stats_request(body=of.ofp_flow_stats_request()))
+        connection.send(of.ofp_stats_request(body=of.ofp_flow_stats_request()))
         connection.send(of.ofp_stats_request(body=of.ofp_port_stats_request()))
 
 def _handle_flowstats(event):
-    log.debug(len(event.stats))
+    # log.debug(flow_stats_to_list(event.stats))
+    stats = flow_stats_to_list(event.stats)
+    dpid = poxutil.dpidToStr(event.connection.dpid)
+    data = {'type': 'switch_flowstats', 'data': {'switch': dpid, 'stats': stats}}
+    data = json.dumps(data)
+    data += '#'
+    _to_pipe(data)
 
 def _handle_portstats(event):
     stats = flow_stats_to_list(event.stats)
@@ -75,6 +82,7 @@ def _handle_portstats(event):
     #log.debug(stats)
     data = {'type':"switch_portstats", "data":{'switch':dpid, 'stats':stats}}
     data = json.dumps(data)
+    data += '#'
     _to_pipe(data)
 
 @poxutil.eval_args
@@ -88,4 +96,4 @@ def launch (bar = False):
     core.openflow.addListenerByName("FlowStatsReceived", _handle_flowstats)
     core.openflow.addListenerByName("PortStatsReceived", _handle_portstats)
 
-    recoco.Timer(10, _request_stats, recurring=True)
+    recoco.Timer(15, _request_stats, recurring=True)
