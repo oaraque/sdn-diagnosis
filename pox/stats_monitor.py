@@ -67,7 +67,7 @@ def _request_stats():
         connection.send(of.ofp_stats_request(body=of.ofp_port_stats_request()))
 
 def _handle_flowstats(event):
-    # log.debug(flow_stats_to_list(event.stats))
+    log.debug(flow_stats_to_list(event.stats))
     stats = flow_stats_to_list(event.stats)
     dpid = poxutil.dpidToStr(event.connection.dpid)
     data = {'type': 'switch_flowstats', 'data': {'switch': dpid, 'stats': stats}}

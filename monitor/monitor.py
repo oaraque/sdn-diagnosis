@@ -46,6 +46,12 @@ def _read_data(data, stats):
                 d['switches'][dpid]['flow_stats'] = text['data']['stats']
                 stats[0] = d
 
+def default_zero():
+    return 0
+
+def defaultdict_with_zero():
+    return defaultdict(default_zero)
+
 def _process_stats(stats, stats_before, stats_processed):
     for switch_dpid, switch in stats[0]['switches'].items():
         
@@ -63,6 +69,7 @@ def _process_stats(stats, stats_before, stats_processed):
                         rx_before = port['rx_packets']
                         tx_before = port['tx_packets']
 
+                # difference between now and before in no of packets
                 rx_diff = port_stat['rx_packets'] - rx_before
                 tx_diff = port_stat['tx_packets'] - tx_before
 
@@ -70,13 +77,33 @@ def _process_stats(stats, stats_before, stats_processed):
                     'rx_packets': port_stat['rx_packets'], 'tx_packets': port_stat['tx_packets']}
                 d['switches'][switch_dpid]['port_stats'].append(new_data)
 
+        d['switches'][switch_dpid]['flow_stats'] = defaultdict(defaultdict_with_zero)
         # Process traffic data with flow stats
         if not switch.get('flow_stats') is None:
-            pass
-        # for flow in switch['flow_stats']:
+            for flow_stat in switch['flow_stats']:
+                addr_dst = flow_stat['match'].get('dl_dst')
+                addr_src = flow_stat['match'].get('dl_src')
 
+                if not addr_dst is None:
+                    addr_dst = _address_to_dec(addr_dst, separator=':')
+                    d['switches'][switch_dpid]['flow_stats'][addr_dst]['packets_in'] += flow_stat['packet_count']
+                    d['switches'][switch_dpid]['flow_stats'][addr_dst]['bytes_in'] += flow_stat['byte_count']
+                if not addr_src is None:
+                    addr_src = _address_to_dec(addr_src, separator=':')
+                    d['switches'][switch_dpid]['flow_stats'][addr_src]['packets_out'] += flow_stat['packet_count']
+                    d['switches'][switch_dpid]['flow_stats'][addr_src]['bytes_out'] += flow_stat['byte_count']
+                
+        print(d)
+        d['switches'] = default_to_regular(d['switches'])
+        print(d)
         stats_processed[0] = d
     stats_before[0] = stats[0]
+
+def default_to_regular(d):
+    if isinstance(d, defaultdict):
+        print('converting')
+        d = {k: default_to_regular(v) for k, v in d.items()}
+    return d
 
 def _address_to_dec(dpid, separator='-'):
     non_zero = ''.join([n for n in str(dpid).split(separator) if not n == '00'])
@@ -96,8 +123,8 @@ def _print_stats(stats, stats_before, stats_processed):
 
         _process_stats(stats, stats_before, stats_processed)
 
+        print(stats_processed)
         message = []
-
         for switch_dpid, values in stats_processed[0]['switches'].items():
             micro_msg = '{0} ({1})\n'.format(switch_dpid,_address_to_dec(switch_dpid))
             for port_stat in values['port_stats']:
