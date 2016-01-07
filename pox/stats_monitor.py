@@ -60,7 +60,7 @@ def _go_up (event):
     log.info("Monitor application ready.")
 
 def _request_stats():
-    log.debug('Number of connections:',len(core.openflow.connections))
+    log.debug('Number of connections: {}'.format(len(core.openflow.connections)))
     log.info('Sending stats requests')
     for connection in core.openflow.connections:
         # log.debug("Sending stats request")
@@ -80,11 +80,21 @@ def _handle_portstats(event):
     stats = flow_stats_to_list(event.stats)
     dpid = poxutil.dpidToStr(event.connection.dpid)
     #log.debug(event.stats)
-    #log.debug(stats)
+    log.debug(dpid)
+    log.debug(stats)
     data = {'type':"switch_portstats", "data":{'switch':dpid, 'stats':stats}}
     data = json.dumps(data)
     data += '#'
     _to_pipe(data)
+
+def _handle_LinkEvent(event):
+    is_up = event.added is True and event.removed is False
+    link = event.link.end
+    data = {'type': 'linkstats', 'data': {'link':link, 'up': is_up}}
+    data = json.dumps(data)
+    data += '#'
+    _to_pipe(data)
+
 
 @poxutil.eval_args
 def launch (bar = False):
@@ -94,6 +104,7 @@ def launch (bar = False):
     log.warn("Bar: %s (%s)", bar, type(bar))
 
     core.addListenerByName("UpEvent", _go_up)
+    core.openflow_discovery.addListenerByName("LinkEvent", _handle_LinkEvent)
     core.openflow.addListenerByName("FlowStatsReceived", _handle_flowstats)
     core.openflow.addListenerByName("PortStatsReceived", _handle_portstats)
 

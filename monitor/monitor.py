@@ -45,6 +45,20 @@ def _read_data(data, stats):
                 d['switches'][dpid]['flow_stats'] = text['data']['stats']
                 stats[0] = d
 
+            if text['type'] == 'linkstats':
+                (dpid1, port1),(dpid2, port2) = text['data']['link']
+                up = 1 if text['data']['up'] is True else 0
+                d = stats[0]
+                d['links'][dpid1][port1] = up
+                d['links'][dpid2][port2] = up
+                # Hack: conn to controller is always up
+                d['links'][dpid1][65534] = 1
+                d['links'][dpid2][65534] = 1
+                stats[0] = d
+
+def default_True():
+    return 1
+
 def default_zero():
     return 0
 
@@ -123,6 +137,14 @@ def _process_stats(stats, stats_before, stats_processed):
 #         d = {k: default_to_regular(v) for k, v in d.items()}
 #     return d
 
+def port_status(switch, port, stats):
+    up = stats[0]['links'].get(switch,{}).get(port,None)
+    if up is None:
+        return '?'
+    if up:
+        return 'up'
+    return 'down'
+
 def _address_to_dec(dpid, separator='-'):
     non_zero = ''.join([n for n in str(dpid).split(separator) if not n == '00'])
     return int('0x{}'.format(str(non_zero)), 16)
@@ -140,15 +162,16 @@ def _print_stats(stats, stats_before, stats_processed):
             continue
 
         _process_stats(stats, stats_before, stats_processed)
-
+        
         message = []
         for switch_dpid, values in stats_processed[0]['switches'].items():
             micro_msg = '{0} ({1})\n'.format(switch_dpid,_address_to_dec(switch_dpid))
             micro_msg += ' -> ports: '
             for port_stat in values['port_stats']:
-                micro_msg += '  {0}=> rx:{1}[{3}], tx:{2}[{4}];'.format(port_stat['port_no'],
+                micro_msg += '  {0}({5})=> rx:{1}[{3}], tx:{2}[{4}];'.format(port_stat['port_no'],
                     port_stat['new_rx_packets'],port_stat['new_tx_packets'],
-                    port_stat['rx_packets'], port_stat['tx_packets'])
+                    port_stat['rx_packets'], port_stat['tx_packets'],
+                    port_status(_address_to_dec(switch_dpid), int(port_stat['port_no']), stats))
 
             micro_msg += '\n -> flows: '
             for host_no, host_stats in values['flow_stats'].items():
@@ -169,7 +192,7 @@ if __name__ == '__main__':
 
     # create a list proxy and append a mutable object (dict)
     stats = manager.list()
-    stats.append({'switches':defaultdict(dict)})
+    stats.append({'switches':defaultdict(dict), 'links': defaultdict(dict)})
 
     stats_before = manager.list()
     stats_before.append({'switches':defaultdict(dict)})
