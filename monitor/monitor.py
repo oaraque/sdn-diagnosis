@@ -19,7 +19,6 @@ def _read_pipe(stats):
             p = multiprocessing.Process(target=_read_data, args=(data,stats))
             p.start()
             count += 1
-            # print(count)
             if count % 10 == 0:
                 pass
                 #print(stats)
@@ -58,6 +57,8 @@ def _process_stats(stats, stats_before, stats_processed):
         d = stats_processed[0]
         d['switches'][switch_dpid]['port_stats'] = list()
 
+        d_stats = stats[0]
+
         # Process traffic data with port stats
         if not switch.get('port_stats') is None:
             for port_stat in switch['port_stats']:
@@ -80,30 +81,47 @@ def _process_stats(stats, stats_before, stats_processed):
         d['switches'][switch_dpid]['flow_stats'] = defaultdict(defaultdict_with_zero)
         # Process traffic data with flow stats
         if not switch.get('flow_stats') is None:
+            hosts_stats = defaultdict(defaultdict_with_zero)
+            # Aggregate all flow stats
             for flow_stat in switch['flow_stats']:
                 addr_dst = flow_stat['match'].get('dl_dst')
                 addr_src = flow_stat['match'].get('dl_src')
 
                 if not addr_dst is None:
                     addr_dst = _address_to_dec(addr_dst, separator=':')
-                    d['switches'][switch_dpid]['flow_stats'][addr_dst]['packets_in'] += flow_stat['packet_count']
-                    d['switches'][switch_dpid]['flow_stats'][addr_dst]['bytes_in'] += flow_stat['byte_count']
+                    hosts_stats[addr_dst]['packets_in'] += flow_stat['packet_count']
+                    hosts_stats[addr_dst]['bytes_in'] += flow_stat['byte_count']
+                    # d['switches'][switch_dpid]['flow_stats'][addr_dst]['packets_in'] += flow_stat['packet_count']
+                    # d['switches'][switch_dpid]['flow_stats'][addr_dst]['bytes_in'] += flow_stat['byte_count']
                 if not addr_src is None:
                     addr_src = _address_to_dec(addr_src, separator=':')
-                    d['switches'][switch_dpid]['flow_stats'][addr_src]['packets_out'] += flow_stat['packet_count']
-                    d['switches'][switch_dpid]['flow_stats'][addr_src]['bytes_out'] += flow_stat['byte_count']
+                    hosts_stats[addr_src]['packets_out'] += flow_stat['packet_count']
+                    hosts_stats[addr_src]['bytes_out'] += flow_stat['byte_count']
+                    # d['switches'][switch_dpid]['flow_stats'][addr_src]['packets_out'] += flow_stat['packet_count']
+                    # d['switches'][switch_dpid]['flow_stats'][addr_src]['bytes_out'] += flow_stat['byte_count']
+
+            for addr, addr_stats in hosts_stats.items():
+                if not switch.get('flow_stats_aggr') is None and not switch['flow_stats_aggr'].get(addr) is None:
+                    in_diff = addr_stats['packets_in'] - switch['flow_stats_aggr'].get(addr)['packets_in']
+                    d['switches'][switch_dpid]['flow_stats'][addr]['new_packets_in'] = in_diff
+                    d['switches'][switch_dpid]['flow_stats'][addr]['packets_in'] = addr_stats['packets_in']
+
+                    out_diff = addr_stats['packets_out'] - switch['flow_stats_aggr'].get(addr)['packets_out']
+                    d['switches'][switch_dpid]['flow_stats'][addr]['new_packets_out'] = out_diff
+                    d['switches'][switch_dpid]['flow_stats'][addr]['packets_out'] = addr_stats['packets_out']
+
+
+            d_stats['switches'][switch_dpid]['flow_stats_aggr'] = hosts_stats
+            stats[0] = d_stats
                 
-        print(d)
-        d['switches'] = default_to_regular(d['switches'])
-        print(d)
         stats_processed[0] = d
     stats_before[0] = stats[0]
 
-def default_to_regular(d):
-    if isinstance(d, defaultdict):
-        print('converting')
-        d = {k: default_to_regular(v) for k, v in d.items()}
-    return d
+# def default_to_regular(d):
+#     if isinstance(d, defaultdict):
+#         print('converting')
+#         d = {k: default_to_regular(v) for k, v in d.items()}
+#     return d
 
 def _address_to_dec(dpid, separator='-'):
     non_zero = ''.join([n for n in str(dpid).split(separator) if not n == '00'])
@@ -114,7 +132,7 @@ def _print_stats(stats, stats_before, stats_processed):
     while True:
         time.sleep(10)
         count += 1
-
+        print(count)
         if count == 1:
             continue
         if count == 2:
@@ -123,17 +141,20 @@ def _print_stats(stats, stats_before, stats_processed):
 
         _process_stats(stats, stats_before, stats_processed)
 
-        print(stats_processed)
         message = []
         for switch_dpid, values in stats_processed[0]['switches'].items():
             micro_msg = '{0} ({1})\n'.format(switch_dpid,_address_to_dec(switch_dpid))
+            micro_msg += ' -> ports: '
             for port_stat in values['port_stats']:
                 micro_msg += '  {0}=> rx:{1}[{3}], tx:{2}[{4}];'.format(port_stat['port_no'],
                     port_stat['new_rx_packets'],port_stat['new_tx_packets'],
                     port_stat['rx_packets'], port_stat['tx_packets'])
 
-            # for flow_stat in values['flow_stats']:
-            #     micro_msg += '\n  '
+            micro_msg += '\n -> flows: '
+            for host_no, host_stats in values['flow_stats'].items():
+                micro_msg += ' {0}=> in:{1}[{3}], out:{2}[{4}];'.format(host_no, 
+                    host_stats['new_packets_in'], host_stats['new_packets_out'],
+                    host_stats['packets_in'], host_stats['packets_out'])
 
             message.append(micro_msg)
 

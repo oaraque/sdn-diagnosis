@@ -60,14 +60,15 @@ def _go_up (event):
     log.info("Monitor application ready.")
 
 def _request_stats():
-    log.debug(len(core.openflow.connections))
+    log.debug('Number of connections:',len(core.openflow.connections))
+    log.info('Sending stats requests')
     for connection in core.openflow.connections:
-        log.debug("Sending stats request")
+        # log.debug("Sending stats request")
         connection.send(of.ofp_stats_request(body=of.ofp_flow_stats_request()))
         connection.send(of.ofp_stats_request(body=of.ofp_port_stats_request()))
 
 def _handle_flowstats(event):
-    log.debug(flow_stats_to_list(event.stats))
+    # log.debug(flow_stats_to_list(event.stats))
     stats = flow_stats_to_list(event.stats)
     dpid = poxutil.dpidToStr(event.connection.dpid)
     data = {'type': 'switch_flowstats', 'data': {'switch': dpid, 'stats': stats}}
