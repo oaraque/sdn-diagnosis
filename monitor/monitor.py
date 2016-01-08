@@ -3,6 +3,7 @@ import json
 import time
 import sys
 import re
+import logging
 from collections import defaultdict
 
 """
@@ -10,9 +11,12 @@ stats = {
     'switches': defaultdict(dict)
 }
 """
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def _read_pipe(stats):
     count = 0
+    logger.info('Ready, reading from pipe')
     while True:
         with open('/dev/shm/poxpipe','r') as pipe:
             data = pipe.read()
@@ -162,7 +166,7 @@ def _print_stats(stats, stats_before, stats_processed):
             continue
 
         _process_stats(stats, stats_before, stats_processed)
-        
+
         message = []
         for switch_dpid, values in stats_processed[0]['switches'].items():
             micro_msg = '{0} ({1})\n'.format(switch_dpid,_address_to_dec(switch_dpid))
@@ -188,6 +192,7 @@ def _print_stats(stats, stats_before, stats_processed):
             out.write(message)
 
 if __name__ == '__main__':
+    logger.info('Starting subprocesses')
     manager = multiprocessing.Manager()
 
     # create a list proxy and append a mutable object (dict)

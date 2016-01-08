@@ -22,3 +22,9 @@ To launch a client that listens to this streaming:
 ```
 vlc http://<server-ip>:8080/test
 ```
+
+## Net errors emulation
+To emulate an error on a link using tc:
+```
+ <switch> tc qdisc change dev <switch>-<interface> parent 5:1 handle 10: netem <options>
+```

@@ -1,0 +1,13 @@
+py "Starting video streaming servers..."
+xterm sv0 sv1
+sv0 sh /home/mininet/server.sh
+py time.sleep(3)
+sv1 sh /home/mininet/server.sh
+py time.sleep(5)
+py "Starting video streaming clients..."
+xterm h20 h13 h15
+h13 sh /home/mininet/client-sv0.sh
+py time.sleep(2)
+h15 sh /home/mininet/client-sv0.sh
+py time.sleep(2)
+h20 sh /home/mininet/client-sv1.sh
