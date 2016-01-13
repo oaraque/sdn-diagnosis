@@ -156,7 +156,7 @@ def _address_to_dec(dpid, separator='-'):
 def _print_stats(stats, stats_before, stats_processed):
     count = 0
     while True:
-        time.sleep(10)
+        time.sleep(5)
         count += 1
         print(count)
         if count == 1:

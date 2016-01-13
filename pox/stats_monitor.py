@@ -108,4 +108,4 @@ def launch (bar = False):
     core.openflow.addListenerByName("FlowStatsReceived", _handle_flowstats)
     core.openflow.addListenerByName("PortStatsReceived", _handle_portstats)
 
-    recoco.Timer(15, _request_stats, recurring=True)
+    recoco.Timer(7, _request_stats, recurring=True)
