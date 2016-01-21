@@ -63,14 +63,14 @@ def _request_stats():
     log.debug('Number of connections: {}'.format(len(core.openflow.connections)))
     log.info('Sending stats requests')
     for connection in core.openflow.connections:
-        # log.debug("Sending stats request")
+        log.debug("Sending stats request")
         connection.send(of.ofp_stats_request(body=of.ofp_flow_stats_request()))
         connection.send(of.ofp_stats_request(body=of.ofp_port_stats_request()))
 
 def _handle_flowstats(event):
-    # log.debug(flow_stats_to_list(event.stats))
     stats = flow_stats_to_list(event.stats)
     dpid = poxutil.dpidToStr(event.connection.dpid)
+    log.debug('Received flow stats from {}'.format(dpid))
     data = {'type': 'switch_flowstats', 'data': {'switch': dpid, 'stats': stats}}
     data = json.dumps(data)
     data += '#'
@@ -79,9 +79,7 @@ def _handle_flowstats(event):
 def _handle_portstats(event):
     stats = flow_stats_to_list(event.stats)
     dpid = poxutil.dpidToStr(event.connection.dpid)
-    #log.debug(event.stats)
-    log.debug(dpid)
-    log.debug(stats)
+    log.debug('Received port stats from {}'.format(dpid))
     data = {'type':"switch_portstats", "data":{'switch':dpid, 'stats':stats}}
     data = json.dumps(data)
     data += '#'

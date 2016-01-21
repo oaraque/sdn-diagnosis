@@ -41,6 +41,29 @@ datacenter_desc = {
 	'sw_sv_links': [[1,2],[3,4],[5,6]]
 }
 
+mini_distributed_topo = {
+    'sw_main_ring': 5,
+    'secondary_rings': [[2, (1,2),(6,7)]],
+    'ring_link_bw': 1000,
+    'ring_link_lat': '5ms',
+    'access_link_bw': 1000,
+    'access_link_lat': '2ms',
+    'hosts': [
+        [[1], 4, None],
+        [[2], 5, None],
+        [[3], 3, None]
+    ]
+}
+
+mini_datacenter_topo = {
+    'link_bw': 1000,
+    'link_lat': '3ms',
+    'sw_acc': [6,7],
+    'name_sws': [8],
+    'n_servers': 2,
+    'sw_sv_links': [[1,2]]
+}
+
 ring_topo = {'sw_main_ring': 10,
         'ring_link_bw': 1000, 
         'ring_link_lat': '3ms'}
@@ -224,5 +247,8 @@ class Ring(Topo):
 
 
 topos = {'distributed': (lambda: Distributed(distributed_topo)), 
-	'videostreaming': (lambda: DataCenterDistributed(distributed_topo, datacenter_desc)),
+	    'videostreaming': (lambda: DataCenterDistributed(distributed_topo, datacenter_desc)),
+        'minivideostreaming': (lambda:
+                               DataCenterDistributed(mini_distributed_topo,
+                                                     mini_datacenter_topo)),
         'ring': (lambda: Ring(ring_topo))}

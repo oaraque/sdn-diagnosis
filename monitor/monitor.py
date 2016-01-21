@@ -5,6 +5,9 @@ import sys
 import re
 import logging
 from collections import defaultdict
+from jinja2 import Template
+import matplotlib.pyplot as plt
+import numpy as np
 
 """
 stats = {
@@ -13,6 +16,8 @@ stats = {
 """
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+server = "192.168.56.101"
 
 def _read_pipe(stats):
     count = 0
@@ -33,6 +38,7 @@ def _read_data(data, stats):
     for text in texts:
         if len(text) > 0:
             text = json.loads(text)
+            print(text.get('data').get('switch'))
             if text['type'] == 'switch_portstats':
                 dpid = text['data']['switch']
                 # mutate the dictionary
@@ -68,6 +74,9 @@ def default_zero():
 
 def defaultdict_with_zero():
     return defaultdict(default_zero)
+
+def default_list():
+    return defaultdict(list)
 
 def _process_stats(stats, stats_before, stats_processed):
     for switch_dpid, switch in stats[0]['switches'].items():
@@ -153,7 +162,42 @@ def _address_to_dec(dpid, separator='-'):
     non_zero = ''.join([n for n in str(dpid).split(separator) if not n == '00'])
     return int('0x{}'.format(str(non_zero)), 16)
 
-def _print_stats(stats, stats_before, stats_processed):
+def _print_graphs(stats_history):
+    stats_data = stats_history[:]
+    stats_data = stats_data[0]
+    switch_list = [dpid for dpid, data in stats_data['switches'].items()]
+    switch_list = sorted(switch_list)
+
+    port_imgs = [None] * len(switch_list)
+    for switch_i, switch_dpid in enumerate(switch_list):
+        if not stats_data['switches'][switch_dpid].get('port_stats') is None:
+            port_list = [p for p, data in stats_data['switches'][switch_dpid]['port_stats'].items()]
+
+            plt.figure()
+
+            for port_no in port_list:
+                rx = stats_data['switches'][switch_dpid]['port_stats'][port_no]['new_rx_packets']
+                x = np.arange(len(rx))
+                print(switch_dpid, port_no, rx)
+                plt.plot(x, rx, label=str(port_no))
+            plt.legend(loc='upper left')
+
+            img_path = 'img/{}_port_rx.png'.format(switch_dpid)
+            port_imgs[switch_i] = img_path
+            plt.savefig('../web/img/{}_port_rx.png'.format(switch_dpid))
+
+    with open('../web/visualize.html') as template_file:
+        template = Template(template_file.read())
+
+    with open('../web/index.html', 'w') as index:
+        print('Writing')
+        index.write(template.render(switches=switch_list, port_imgs=port_imgs))
+
+
+
+        
+
+def _print_stats(stats, stats_before, stats_processed, stats_history):
     count = 0
     while True:
         time.sleep(5)
@@ -167,29 +211,63 @@ def _print_stats(stats, stats_before, stats_processed):
 
         _process_stats(stats, stats_before, stats_processed)
 
-        message = []
+        # message = []
+        # for switch_dpid, values in stats_processed[0]['switches'].items():
+        #     micro_msg = '{0} ({1})\n'.format(switch_dpid,_address_to_dec(switch_dpid))
+        #     micro_msg += ' -> ports: '
+        #     for port_stat in values['port_stats']:
+        #         micro_msg += '  {0}({5})=> rx:{1}[{3}], tx:{2}[{4}];'.format(port_stat['port_no'],
+        #             port_stat['new_rx_packets'],port_stat['new_tx_packets'],
+        #             port_stat['rx_packets'], port_stat['tx_packets'],
+        #             port_status(_address_to_dec(switch_dpid), int(port_stat['port_no']), stats))
+
+        #     micro_msg += '\n -> flows: '
+        #     for host_no, host_stats in values['flow_stats'].items():
+        #         micro_msg += ' {0}=> in:{1}[{3}], out:{2}[{4}];'.format(host_no, 
+        #             host_stats['new_packets_in'], host_stats['new_packets_out'],
+        #             host_stats['packets_in'], host_stats['packets_out'])
+
+        #     message.append(micro_msg)
+
+        # message = sorted(message, key=lambda msg: re.search('((.*))',msg).group(1))
+        # message = '\n'.join(message)
+
+        # with open('/dev/shm/monitor-stats.log','w') as out:
+        #     out.write(message)
+
+        d = stats_history[0]
+
+        if count == 3: 
+            for switch_dpid, values in stats_processed[0]['switches'].items():   
+                d['switches'][switch_dpid]['port_stats'] = defaultdict(default_list)
+                d['switches'][switch_dpid]['flow_stats'] = defaultdict(default_list)
+            stats_history[0] = d    
+            continue
+
         for switch_dpid, values in stats_processed[0]['switches'].items():
-            micro_msg = '{0} ({1})\n'.format(switch_dpid,_address_to_dec(switch_dpid))
-            micro_msg += ' -> ports: '
             for port_stat in values['port_stats']:
-                micro_msg += '  {0}({5})=> rx:{1}[{3}], tx:{2}[{4}];'.format(port_stat['port_no'],
-                    port_stat['new_rx_packets'],port_stat['new_tx_packets'],
-                    port_stat['rx_packets'], port_stat['tx_packets'],
-                    port_status(_address_to_dec(switch_dpid), int(port_stat['port_no']), stats))
-
-            micro_msg += '\n -> flows: '
+                port_no = port_stat['port_no']
+                try:
+                    d['switches'][switch_dpid]['port_stats'][port_no]['new_rx_packets'].append(port_stat['new_rx_packets'])
+                    d['switches'][switch_dpid]['port_stats'][port_no]['new_tx_packets'].append(port_stat['new_tx_packets'])
+                    d['switches'][switch_dpid]['port_stats'][port_no]['port_no'] = port_no
+                except Exception as e:
+                    print('Error:', e)
+                    continue
+            
             for host_no, host_stats in values['flow_stats'].items():
-                micro_msg += ' {0}=> in:{1}[{3}], out:{2}[{4}];'.format(host_no, 
-                    host_stats['new_packets_in'], host_stats['new_packets_out'],
-                    host_stats['packets_in'], host_stats['packets_out'])
+                try:
+                    d['switches'][switch_dpid]['flow_stats'][host_no]['new_packets_in'].append(host_stats['new_packets_in'])
+                    d['switches'][switch_dpid]['flow_stats'][host_no]['new_packets_out'].append(host_stats['new_packets_out'])
+                    d['switches'][switch_dpid]['flow_stats'][host_no]['host_no'] = host_no
+                except Exception as e:
+                    print('Error:',e)
+                    continue
 
-            message.append(micro_msg)
+        stats_history[0] = d
 
-        message = sorted(message, key=lambda msg: re.search('((.*))',msg).group(1))
-        message = '\n'.join(message)
+        _print_graphs(stats_history)        
 
-        with open('/dev/shm/monitor-stats.log','w') as out:
-            out.write(message)
 
 if __name__ == '__main__':
     logger.info('Starting subprocesses')
@@ -205,8 +283,11 @@ if __name__ == '__main__':
     stats_processed = manager.list()
     stats_processed.append({'switches':defaultdict(dict)})
 
+    stats_history = manager.list()
+    stats_history.append({'switches':defaultdict(dict)})
+
     printer = multiprocessing.Process(target=_print_stats, 
-        args=(stats,stats_before, stats_processed))
+        args=(stats,stats_before, stats_processed, stats_history))
     printer.start()
 
     try:

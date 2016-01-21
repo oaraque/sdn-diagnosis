@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SDN Monitor</title>
+<script type="text/javascript">
+    setTimeout("location.reload(true);",3500);
+</script>
+</head>
+
+<body >
+
+{% for dpid in switches %}
+<div style='display:inline-block'>
+<h1>{{dpid}}</h1>
+<span><img src="{{ port_imgs[loop.index0] }}"></img></span>
+</div>
+{% endfor %}
+
+
+
+</body>
+
+</html> 
