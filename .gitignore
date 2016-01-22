@@ -58,3 +58,6 @@ target/
 
 # VIM swp
 *.swp
+
+# Images in web visualization
+web/img/
