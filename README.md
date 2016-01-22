@@ -4,7 +4,7 @@ Fault Diagnosis on SDN Networks
 ## Mininet
 Launch mininet:
 ```
-sudo ./pox.py forwarding.l2_pairs openflow.discovery openflow.spanning_tree --no-flood --hold-down log.level --INFO
+sudo mn --mac --custom sdn-monitor/mininet/topo.py --topo minivideostreaming --switch ovsk --controller remote
 ```
 
 Lauch with monitor module enabled and grepping for interesting data only:
