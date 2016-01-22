@@ -72,6 +72,7 @@ def _handle_flowstats(event):
     dpid = poxutil.dpidToStr(event.connection.dpid)
     log.debug('Received flow stats from {}'.format(dpid))
     data = {'type': 'switch_flowstats', 'data': {'switch': dpid, 'stats': stats}}
+    log.debug(data)
     data = json.dumps(data)
     data += '#'
     _to_pipe(data)

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>SDN Monitor</title>
 <script type="text/javascript">
-    setTimeout("location.reload(true);",3500);
+    setTimeout("location.reload(true);",4000);
 </script>
 </head>
 
@@ -12,8 +12,15 @@
 
 {% for dpid in switches %}
 <div style='display:inline-block'>
-<h1>{{dpid}}</h1>
-<span><img src="{{ port_imgs[loop.index0] }}"></img></span>
+	<h1>{{dpid}}</h1>
+		<div style='align: left'>
+			<span><h3>Ports RX</h3><img src="{{ port_rx_imgs[loop.index0] }}"></img></span>
+			<span><h3>Ports TX</h3><img src="{{ port_tx_imgs[loop.index0] }}"></img></span>
+		</div>
+		<div style='align: right'>
+			<span><h3>Flows IN</h3><img src="{{ flows_in_imgs[loop.index0] }}"></img></span>
+			<span><h3>Flows OUT</h3><img src="{{ flows_out_imgs[loop.index0] }}"></img></span>
+		</div>
 </div>
 {% endfor %}
 

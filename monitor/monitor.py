@@ -6,6 +6,7 @@ import re
 import logging
 from collections import defaultdict
 from jinja2 import Template
+from scipy.interpolate import spline
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -38,7 +39,6 @@ def _read_data(data, stats):
     for text in texts:
         if len(text) > 0:
             text = json.loads(text)
-            print(text.get('data').get('switch'))
             if text['type'] == 'switch_portstats':
                 dpid = text['data']['switch']
                 # mutate the dictionary
@@ -162,36 +162,121 @@ def _address_to_dec(dpid, separator='-'):
     non_zero = ''.join([n for n in str(dpid).split(separator) if not n == '00'])
     return int('0x{}'.format(str(non_zero)), 16)
 
+def _soft_plot(x,y):
+    if x.shape[0] < 5:
+        return x, y
+    soft_factor = 10 * x.shape[0]
+    xnew = np.linspace(x.min(), x.max(), soft_factor)
+    try:
+        smooth = spline(x,y,xnew)
+    except ValueError:
+        return x,y
+    return xnew, smooth
+
+
 def _print_graphs(stats_history):
     stats_data = stats_history[:]
     stats_data = stats_data[0]
     switch_list = [dpid for dpid, data in stats_data['switches'].items()]
     switch_list = sorted(switch_list)
 
-    port_imgs = [None] * len(switch_list)
+    port_rx_imgs = [None] * len(switch_list)
+    port_tx_imgs = [None] * len(switch_list)
+    flows_in_imgs = [None] * len(switch_list)
+    flows_out_imgs = [None] * len(switch_list)
     for switch_i, switch_dpid in enumerate(switch_list):
         if not stats_data['switches'][switch_dpid].get('port_stats') is None:
             port_list = [p for p, data in stats_data['switches'][switch_dpid]['port_stats'].items()]
 
             plt.figure()
 
+            rx = np.array(list())
+            x_rx = np.array(list())
             for port_no in port_list:
                 rx = stats_data['switches'][switch_dpid]['port_stats'][port_no]['new_rx_packets']
-                x = np.arange(len(rx))
-                print(switch_dpid, port_no, rx)
-                plt.plot(x, rx, label=str(port_no))
-            plt.legend(loc='upper left')
+                rx = np.array(rx)
+                x_rx = np.arange(len(rx))
+                status = stats_data['switches'][switch_dpid]['port_stats'][port_no]['port_status']
+                label = str(port_no) + ': ' +  status
+                x_rx, rx = _soft_plot(x_rx, rx)
+                plt.plot(x_rx, rx, label=label)
 
+            plt.legend(loc='upper left')
             img_path = 'img/{}_port_rx.png'.format(switch_dpid)
-            port_imgs[switch_i] = img_path
+            port_rx_imgs[switch_i] = img_path
             plt.savefig('../web/img/{}_port_rx.png'.format(switch_dpid))
+            plt.close()
+
+            plt.figure()
+
+            tx = np.array(list())
+            x_tx = np.array(list())
+            for port_no in port_list:
+                tx = stats_data['switches'][switch_dpid]['port_stats'][port_no]['new_tx_packets']
+                tx = np.array(tx)
+                x_tx = np.arange(len(tx))
+                status = stats_data['switches'][switch_dpid]['port_stats'][port_no]['port_status']
+                label = str(port_no) + ': ' + status
+                x_tx, tx = _soft_plot(x_tx, tx)
+                plt.plot(x_tx, tx, label=label)
+
+            plt.legend(loc='upper left')
+            img_path = 'img/{}_port_tx.png'.format(switch_dpid)
+            port_tx_imgs[switch_i] = img_path
+            plt.savefig('../web/img/{}_port_tx.png'.format(switch_dpid))
+            plt.close()
+
+        if not stats_data['switches'][switch_dpid].get('flow_stats') is None:
+            # print(stats_data['switches'][switch_dpid].get('flow_stats'))
+            hosts_list = [host_no for host_no, data in stats_data['switches'][switch_dpid]['flow_stats'].items()]          
+
+            plt.figure()
+
+            # the only flow that is installed from the beginning
+            controller_host_no = 19079169
+            x_length = len(stats_data['switches'][switch_dpid]['flow_stats'][controller_host_no]['new_packets_in'])
+            for host_no in hosts_list:
+                in_ = stats_data['switches'][switch_dpid]['flow_stats'][host_no]['new_packets_in']
+                in_ = np.array(in_)
+                if len(in_) < x_length:
+                    in_ = np.concatenate((np.zeros(x_length), in_), axis=0)
+                x_in_ = np.arange(in_.shape[0])
+                x_in_, in_ = _soft_plot(x_in_, in_)
+                plt.plot(x_in_, in_, label=str(host_no))
+
+            plt.legend(loc='upper left')
+            img_path = 'img/{}_flows_in.png'.format(switch_dpid)
+            flows_in_imgs[switch_i] = img_path
+            plt.savefig('../web/img/{}_flows_in.png'.format(switch_dpid))
+            plt.close()
+
+            x_length = len(stats_data['switches'][switch_dpid]['flow_stats'][controller_host_no]['new_packets_out'])
+            for host_no in hosts_list:
+                out_ = stats_data['switches'][switch_dpid]['flow_stats'][host_no]['new_packets_out']
+                out_ = np.array(out_)
+                if len(in_) < x_length:
+                    out_ = np.concatenate((np.zeros(x_length), out_), axis=0)
+                x_out_ = np.arange(out_.shape[0])
+                x_out_, out_ = _soft_plot(x_out_, out_)
+                plt.plot(x_out_, out_, label=str(host_no))
+
+            plt.legend(loc='upper left')
+            img_path = 'img/{}_flows_out.png'.format(switch_dpid)
+            flows_out_imgs[switch_i] = img_path
+            plt.savefig('../web/img/{}_flows_out.png'.format(switch_dpid))
+            plt.close()
+
 
     with open('../web/visualize.html') as template_file:
         template = Template(template_file.read())
 
     with open('../web/index.html', 'w') as index:
         print('Writing')
-        index.write(template.render(switches=switch_list, port_imgs=port_imgs))
+        index.write(template.render(switches=switch_list, 
+            port_rx_imgs=port_rx_imgs,
+            port_tx_imgs=port_tx_imgs,
+            flows_in_imgs=flows_in_imgs,
+            flows_out_imgs=flows_out_imgs))
 
 
 
@@ -251,6 +336,8 @@ def _print_stats(stats, stats_before, stats_processed, stats_history):
                     d['switches'][switch_dpid]['port_stats'][port_no]['new_rx_packets'].append(port_stat['new_rx_packets'])
                     d['switches'][switch_dpid]['port_stats'][port_no]['new_tx_packets'].append(port_stat['new_tx_packets'])
                     d['switches'][switch_dpid]['port_stats'][port_no]['port_no'] = port_no
+                    port_status_ = port_status(_address_to_dec(switch_dpid), int(port_stat['port_no']), stats)
+                    d['switches'][switch_dpid]['port_stats'][port_no]['port_status'] = port_status_
                 except Exception as e:
                     print('Error:', e)
                     continue
