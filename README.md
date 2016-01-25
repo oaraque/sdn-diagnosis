@@ -12,6 +12,11 @@ Lauch with monitor module enabled and grepping for interesting data only:
 sudo ./pox.py forwarding.l2_pairs openflow.discovery openflow.spanning_tree --no-flood --hold-down monitor log.level --DEBUG 2>&1 | grep -i "Monitor\|connected\|ports"
 ```
 
+Aditionally, another combination of pox modules:
+```
+./pox.py openflow.discovery proto.arp_responder  l3_rules --rules_path=<rules-path> stats_monitor log.level --INFO 2>&1 | grep -i "Monitor\|connected\|ports\|rule\|discovery\|arp"
+```
+
 ## Video streaming
 To launch a server to stream video via HTTP (this can depend on the video source):
 ```
