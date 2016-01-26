@@ -19,7 +19,8 @@ stats = {
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-server = "192.168.56.101"
+low_limit = 100
+high_limit = 3000
 
 def _read_pipe(stats):
     count = 0
@@ -251,11 +252,12 @@ def _print_graphs(stats_history):
             # print(stats_data['switches'][switch_dpid].get('flow_stats'))
             hosts_list = [host_no for host_no, data in stats_data['switches'][switch_dpid]['flow_stats'].items()]          
 
-            plt.figure()
+            fig = plt.figure()
 
             # the only flow that is installed from the beginning
             controller_host_no = 19079169
             x_length = len(stats_data['switches'][switch_dpid]['flow_stats'][controller_host_no]['new_packets'])
+            alarm = False
             for host_no in hosts_list:
                 in_ = stats_data['switches'][switch_dpid]['flow_stats'][host_no]['new_packets']
                 in_ = np.array(in_)
@@ -264,13 +266,25 @@ def _print_graphs(stats_history):
                     in_ = np.concatenate((np.zeros(length_append), in_), axis=0)
                 x_in_ = np.arange(in_.shape[0])
                 x_in_, in_ = _soft_plot(x_in_, in_)
+                if in_[-1] < low_limit:
+                    if not host_no == controller_host_no:
+                        if in_[-1] > 10: # do not consider few traffic
+                            alarm = True
+                # elif in_[-1] > high_limit:
+                #     alarm = True
                 label = '{}:80'.format(str(host_no))
                 plt.plot(x_in_, in_, label=str(host_no))
+
+            if alarm:
+                fig.patch.set_facecolor('red')
+
+            plt.plot(x_in_, np.array([low_limit]*len(in_)))
+            # plt.plot(x_in_, np.array([high_limit]*len(in_)))
 
             plt.legend(loc='upper left')
             img_path = 'img/{}_flows.png'.format(switch_dpid)
             flows_imgs[switch_i] = img_path
-            plt.savefig('../web/img/{}_flows.png'.format(switch_dpid))
+            plt.savefig('../web/img/{}_flows.png'.format(switch_dpid), facecolor=fig.get_facecolor())
             plt.close()
 
             # x_length = len(stats_data['switches'][switch_dpid]['flow_stats'][controller_host_no]['new_packets_out'])
