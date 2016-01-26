@@ -1,0 +1,11 @@
+py "Starting video streaming servers..."
+xterm sv0 sv1
+sv0 sh /tmp/sdn-diagnosis/scripts/server.sh
+py time.sleep(5)
+py "Starting video streaming clients..."
+xterm h1 h2 h3
+h1 sh /tmp/sdn-diagnosis/scripts/client-sv0.sh
+py time.sleep(2)
+h2 sh /tmp/sdn-diagnosis/scripts/client-sv0.sh
+py time.sleep(2)
+h3 sh /tmp/sdn-diagnosis/scripts/client-sv0.sh

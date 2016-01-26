@@ -60,4 +60,4 @@ target/
 *.swp
 
 # Images in web visualization
-web/img/
+web/img/*

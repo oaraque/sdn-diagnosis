@@ -41,7 +41,7 @@ def _handle_PacketIn(event):
 		msg.match.nw_dst = ip.dstip
 		msg.match.nw_proto = 6
 		msg.match.tp_dst = 80
-		msg.idle_timeout = 10
+		msg.idle_timeout = 500
 		msg.actions.append(of.ofp_action_output(port=outport))
 		msg.data = event.ofp
 		event.connection.send(msg)
